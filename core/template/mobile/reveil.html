@@ -1,0 +1,187 @@
+<div class="eqLogic eqLogic-widget allowResize reveil-widget #empty_class#" data-eqType="#eqType#" data-eqLogic_id="#id#" data-eqLogic_uid="#uid#" data-version="#version#" data-translate-category="#translate_category#" data-category="#category#" data-tags="#tags#" style="width:#width#;height:#height#;#style#">
+  <center class="widget-name">
+    <span class="warning" title="#alert_name#"><i class='#alert_icon#'></i></span>
+    <span class="cmd refresh pull-right cursor" data-cmd_id="#refresh_id#"><i class="fas fa-sync"></i></span>
+    <span class="reportModeVisible">#name_display# <span class="object_name">#object_name#</span></span>
+    <a href="#eqLink#" class="reportModeHidden">#name_display# <span class="object_name">#object_name#</span></a>
+  </center>
+
+  <div class="rv-next" title="#sync_title#">
+    <i class="fas fa-circle rv-sync-#sync_class#"></i> <span>#next_wake#</span>
+  </div>
+  <div class="rv-welcome">
+    <div>{{Aucun horaire pour l'instant.}}</div>
+    <a class="btn btn-success rv-open-editor"><i class="fas fa-cog"></i> {{Configurer les horaires}}</a>
+  </div>
+  <div class="rv-pens">
+    <span class="rv-pen rv-pen-time" data-pen="time"><i class="fas fa-pen"></i> {{Heure}}</span>
+    <span class="rv-pen rv-pen-conges active" data-pen="conges"><i class="fas fa-circle"></i> {{Congé}}</span>
+    <span class="rv-pen rv-pen-child" data-pen="garde"><i class="fas fa-child"></i> {{Enfant}}</span>
+    #day_pens#
+    <span class="rv-gear rv-open-editor" title="{{Régler les horaires}}"><i class="fas fa-cog"></i></span>
+  </div>
+  <div class="rv-pop" style="display:none;">
+    <div class="rv-pop-date"></div>
+    <input type="time" class="rv-pop-time"/>
+    <div class="rv-pop-btns">
+      <a class="btn btn-xs btn-success rv-pop-ok">{{OK}}</a>
+      <a class="btn btn-xs btn-default rv-pop-off">{{Pas de réveil}}</a>
+      <a class="btn btn-xs btn-default rv-pop-reset">{{Normal}}</a>
+      <a class="btn btn-xs btn-default rv-pop-close"><i class="fas fa-times"></i></a>
+    </div>
+  </div>
+  <div class="rv-cal">#grid#</div>
+  <div class="rv-legend"><span class="rv-l rv-l-conges"></span>{{Congé}} <span class="rv-l rv-l-exc"></span>{{Modifié}} <span class="rv-l rv-l-off"></span>{{Férié}} <span class="rv-l rv-l-child"></span>{{Avec enfant}} <span class="rv-l rv-l-day"></span>{{Profil du jour}}</div>
+
+  <style>
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-next { text-align:center; font-size:1.3em; font-weight:bold; margin:2px 0 6px; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-sync-ok { color:#4caf50; font-size:.6em; vertical-align:middle; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-sync-ko { color:#e53935; font-size:.6em; vertical-align:middle; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-cal { padding:0 6px; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-head,
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-grid { display:grid; grid-template-columns:30px repeat(7, 1fr); gap:3px; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-head span { text-align:center; font-size:.75em; opacity:.6; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-day { display:flex; flex-direction:column; align-items:center; justify-content:center;
+      min-height:46px; padding:2px 0; box-sizing:border-box; overflow:hidden; border-radius:6px; background:rgba(128,128,128,.12); cursor:pointer; user-select:none; line-height:1.15; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-week { display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:.7em; opacity:.6; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-week i { font-size:1.1em; margin-top:2px; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-custody { opacity:1; color:#1e88e5; font-weight:bold; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-num { font-size:.72em; opacity:.75; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-time { font-size:.85em; font-weight:bold; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-off .rv-time { opacity:.4; font-weight:normal; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-ferie { background:rgba(128,128,128,.28); }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-exception { box-shadow:inset 0 0 0 2px #fb8c00; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-conges { background:#e53935; color:#fff; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-child { box-shadow:inset 0 -4px 0 #1e88e5; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-exception.rv-child { box-shadow:inset 0 0 0 2px #fb8c00, inset 0 -4px 0 #1e88e5; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pens { display:flex; flex-wrap:wrap; justify-content:center; gap:6px; margin:0 0 6px; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pen { padding:2px 10px; border-radius:12px; font-size:.8em; cursor:pointer; border:1px solid rgba(128,128,128,.4); opacity:.6; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pen-conges i { color:#e53935; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pen-child i { color:#1e88e5; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pen-day i { color:#8e24aa; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pen-time i { color:#fb8c00; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] { position:relative; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-gear { padding:2px 8px; cursor:pointer; opacity:.7; font-size:.95em; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-gear:hover { opacity:1; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-welcome { display:none; text-align:center; padding:18px 8px; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-welcome .btn { margin-top:10px; }
+    .reveil-widget.rv-empty[data-eqLogic_uid="#uid#"] .rv-welcome { display:block; }
+    .reveil-widget.rv-empty[data-eqLogic_uid="#uid#"] .rv-pens,
+    .reveil-widget.rv-empty[data-eqLogic_uid="#uid#"] .rv-cal,
+    .reveil-widget.rv-empty[data-eqLogic_uid="#uid#"] .rv-legend,
+    .reveil-widget.rv-empty[data-eqLogic_uid="#uid#"] .rv-next { display:none; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pop { position:absolute; z-index:20; left:50%; top:40%; transform:translate(-50%,-50%);
+      background:var(--bg-modal-color, #2b2b2b); border:1px solid rgba(128,128,128,.5); border-radius:8px; padding:10px; text-align:center; min-width:220px; box-shadow:0 4px 16px rgba(0,0,0,.4); }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pop-date { font-weight:bold; margin-bottom:6px; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pop-time { font-size:1.4em; width:130px; text-align:center; margin-bottom:8px; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pop-btns .btn { margin:2px; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-dayprof { box-shadow:inset 0 0 0 2px #8e24aa; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-dayprof.rv-child { box-shadow:inset 0 0 0 2px #8e24aa, inset 0 -4px 0 #1e88e5; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-dname { font-size:.62em; color:#ce93d8; line-height:1.1; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-conges .rv-dname { color:#fff; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pen.active { opacity:1; font-weight:bold; border-color:currentColor; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-l-day { box-shadow:inset 0 0 0 2px #8e24aa; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-l-child { box-shadow:inset 0 -3px 0 #1e88e5; background:rgba(128,128,128,.12); }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-today { outline:2px solid currentColor; outline-offset:-2px; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-gone { background:transparent !important; box-shadow:none !important; cursor:default; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-busy { opacity:.5; pointer-events:none; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-legend { font-size:.7em; opacity:.7; text-align:center; margin:5px 0 3px; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-l { display:inline-block; width:9px; height:9px; border-radius:2px; margin:0 3px 0 8px; vertical-align:middle; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-l-conges { background:#e53935; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-l-exc { box-shadow:inset 0 0 0 2px #fb8c00; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-l-off { background:rgba(128,128,128,.28); }
+  </style>
+  <script>
+    (function () {
+      var root = document.querySelector('.reveil-widget[data-eqLogic_uid="#uid#"]');
+      if (!root) { return; }
+      var KEY = 'reveil_pen_#id#';
+      var pen = 'conges';
+      try { pen = localStorage.getItem(KEY) || 'conges'; } catch (e) {}
+      var pens = root.querySelectorAll('.rv-pen');
+      function setPen(p) {
+        // crayon mémorisé mais disparu (profil du jour supprimé) : retour à Congé
+        if (!Array.prototype.some.call(pens, function (el) { return el.dataset.pen == p; })) { p = 'conges'; }
+        pen = p;
+        pens.forEach(function (el) { el.classList.toggle('active', el.dataset.pen == p); });
+        try { localStorage.setItem(KEY, p); } catch (e) {}
+      }
+      pens.forEach(function (el) { el.addEventListener('click', function () { setPen(el.dataset.pen); }); });
+      setPen(pen);
+      var cmds = {conges: '#toggle_id#', garde: '#toggle_garde_id#'};
+      var cls = {conges: 'rv-conges', garde: 'rv-child'};
+      // ---- ouverture de l'éditeur complet ----
+      function openEditor() {
+        var title = (root.querySelector('.widget-name a') || {}).textContent || 'Réveil';
+        var url = 'index.php?v=d&plugin=reveil&modal=reveil.editor&id=#id#';
+        if (window.jeeDialog) {
+          jeeDialog.dialog({id: 'jee_modal', title: title.trim(), contentUrl: url});
+        } else if (window.$ && $('#md_modal').length) {
+          $('#md_modal').dialog({title: title.trim()}).load(url).dialog('open');
+        } else {
+          window.location.href = 'index.php?v=d&m=reveil&p=reveil&id=#id#';
+        }
+      }
+      root.querySelectorAll('.rv-open-editor').forEach(function (el) { el.addEventListener('click', openEditor); });
+
+      // ---- bulle "Heure" ----
+      var pop = root.querySelector('.rv-pop'), popDate = null, popCell = null;
+      var dayNames = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+      function sendException(value) {
+        if (!popDate) { return; }
+        popCell.classList.add('rv-busy');
+        pop.style.display = 'none';
+        jeedom.cmd.execute({
+          id: '#exception_id#',
+          value: {title: popDate, message: value},
+          error: function (e) {
+            popCell.classList.remove('rv-busy');
+            if (window.jeedomUtils && jeedomUtils.showAlert) { jeedomUtils.showAlert({message: (e && e.message) ? e.message : '{{Erreur}}', level: 'danger'}); }
+          }
+        });
+      }
+      function openPop(cell) {
+        popCell = cell;
+        popDate = cell.dataset.date;
+        var dt = new Date(popDate + 'T12:00:00');
+        root.querySelector('.rv-pop-date').textContent = dayNames[dt.getDay()] + ' ' + dt.getDate() + '/' + (dt.getMonth() + 1);
+        var t = (cell.querySelector('.rv-time') || {}).textContent || '';
+        root.querySelector('.rv-pop-time').value = /^\d{2}:\d{2}$/.test(t) ? t : '07:00';
+        pop.style.display = 'block';
+      }
+      root.querySelector('.rv-pop-ok').addEventListener('click', function () {
+        var v = root.querySelector('.rv-pop-time').value;
+        if (/^\d{1,2}:\d{2}$/.test(v)) { sendException(v); }
+      });
+      root.querySelector('.rv-pop-off').addEventListener('click', function () { sendException('off'); });
+      root.querySelector('.rv-pop-reset').addEventListener('click', function () { sendException(''); });
+      root.querySelector('.rv-pop-close').addEventListener('click', function () { pop.style.display = 'none'; });
+
+      root.querySelectorAll('.rv-day:not(.rv-gone)').forEach(function (cell) {
+        cell.addEventListener('click', function () {
+          if (pen == 'time') { openPop(cell); return; }
+          var isDay = pen.indexOf('day:') === 0;
+          var c = isDay ? 'rv-dayprof' : cls[pen];
+          var cmdId = isDay ? '#toggle_day_id#' : cmds[pen];
+          if (!cmdId) {
+            if (window.jeedomUtils && jeedomUtils.showAlert) { jeedomUtils.showAlert({message: '{{Commande de bascule introuvable, sauvegardez l\'équipement}}', level: 'danger'}); }
+            return;
+          }
+          // bascule immédiate à l'écran, le widget est ensuite régénéré par le serveur
+          cell.classList.toggle(c);
+          cell.classList.add('rv-busy');
+          jeedom.cmd.execute({
+            id: cmdId,
+            value: {title: cell.dataset.date, message: isDay ? pen.substring(4) : ''},
+            error: function (e) {
+              cell.classList.toggle(c);
+              cell.classList.remove('rv-busy');
+              if (window.jeedomUtils && jeedomUtils.showAlert) { jeedomUtils.showAlert({message: (e && e.message) ? e.message : '{{Erreur lors de la bascule}}', level: 'danger'}); }
+              console.error('reveil', pen, cell.dataset.date, e);
+            }
+          });
+        });
+      });
+    })();
+  </script>
+</div>

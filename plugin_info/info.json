@@ -1,0 +1,17 @@
+{
+    "id": "reveil",
+    "name": "Réveils",
+    "description": {
+        "fr_FR": "Gestion centralisée des réveils (Alexa, Rémi) : profils hebdomadaires, garde alternée, congés, fériés et présence, avec vérification de la programmation sur les appareils."
+    },
+    "licence": "AGPL",
+    "author": "Anthony",
+    "require": "4.4",
+    "category": "organization",
+    "hasDependency": false,
+    "hasOwnDeamon": false,
+    "maxDependancyInstallTime": 0,
+    "changelog": "",
+    "documentation": "",
+    "language": "fr_FR"
+}
