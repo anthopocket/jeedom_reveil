@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="7"/>
+      <feOffset dx="5" dy="8" result="b"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.30"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <!-- fond : carré arrondi vert Jeedom -->
+  <rect x="8" y="8" width="496" height="496" rx="78" ry="78" fill="#95C12B"/>
+
+  <g filter="url(#sh)" fill="#FFFFFF" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+    <!-- cloches -->
+    <path d="M118 150 A62 62 0 0 1 196 92 Z" stroke-width="10"/>
+    <path d="M394 150 A62 62 0 0 0 316 92 Z" stroke-width="10"/>
+    <!-- pieds -->
+    <line x1="166" y1="392" x2="138" y2="428" stroke-width="26" fill="none"/>
+    <line x1="346" y1="392" x2="374" y2="428" stroke-width="26" fill="none"/>
+    <!-- boîtier -->
+    <circle cx="256" cy="268" r="148" stroke="none"/>
+  </g>
+
+  <!-- cadran -->
+  <circle cx="256" cy="268" r="118" fill="#95C12B"/>
+  <circle cx="256" cy="268" r="104" fill="#FFFFFF"/>
+  <!-- repères -->
+  <g stroke="#95C12B" stroke-width="12" stroke-linecap="round">
+    <line x1="256" y1="180" x2="256" y2="198"/>
+    <line x1="256" y1="338" x2="256" y2="356"/>
+    <line x1="168" y1="268" x2="186" y2="268"/>
+    <line x1="326" y1="268" x2="344" y2="268"/>
+  </g>
+  <!-- aiguilles : 7 h 00 -->
+  <g stroke="#5F7F17" stroke-linecap="round">
+    <line x1="256" y1="268" x2="256" y2="200" stroke-width="14"/>
+    <line x1="256" y1="268" x2="220" y2="318" stroke-width="16"/>
+  </g>
+  <circle cx="256" cy="268" r="13" fill="#5F7F17"/>
+
+  <!-- pastille "vérifié" -->
+  <g filter="url(#sh)">
+    <circle cx="372" cy="382" r="62" fill="#FFFFFF"/>
+  </g>
+  <circle cx="372" cy="382" r="50" fill="#5F7F17"/>
+  <path d="M347 383 L365 401 L399 365" fill="none" stroke="#FFFFFF" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
