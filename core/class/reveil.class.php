@@ -228,8 +228,8 @@ class reveil extends eqLogic {
             if (!$this->getConfiguration($key, 0)) {
                 continue;
             }
-            if ($target == 'Rémi' && $this->remiTarget($wake) === null) {
-                $parts[] = 'Rémi ' . $this->remiWaitReason($wake);
+            if ($target == 'Rémi') {
+                $parts[] = $this->remiStatusPart();
             } else {
                 $parts[] = $target . ' ' . $wake['time'] . ' passé';
             }
@@ -281,23 +281,18 @@ class reveil extends eqLogic {
         }
         $sig = 'idle|' . $next['datetime'];
         if ($force || $sig !== $this->getCache('pushedFor', '')) {
-            // le Rémi a une récurrence hebdomadaire : on le désactive pour qu'il ne resonne pas
-            if ($this->getConfiguration('remiEnable', 0)) {
-                try {
-                    $this->pushRemi(null);
-                } catch (Exception $e) {
-                    log::add('reveil', 'warning', $this->getHumanName() . ' Rémi : ' . $e->getMessage());
-                }
-            }
-            // à la mise en place, l'Alexa et le Rémi seront (re)programmés
-            $this->setCaches(array('pushedFor' => $sig, 'pushedAlexa' => '', 'pushedRemi' => '', 'verified' => true, 'retry' => 0, 'alerted' => false));
+            // à la mise en place, l'Alexa sera (re)programmée
+            $this->setCaches(array('pushedFor' => $sig, 'pushedAlexa' => '', 'verified' => true, 'retry' => 0, 'alerted' => false));
             log::add('reveil', 'info', $this->getHumanName() . ' prochain réveil ' . $next['datetime'] . ', mis en place le ' . date('Y-m-d H:i', self::armTime($next)));
         }
+        // le Rémi suit son propre réveil (heure forcée possible), indépendamment de l'attente de l'Alexa
+        $this->syncRemiOnly();
         $parts = array();
-        foreach (array('Alexa' => 'alexaEnable', 'Rémi' => 'remiEnable') as $target => $key) {
-            if ($this->getConfiguration($key, 0)) {
-                $parts[] = $target . ($target == 'Rémi' ? ' désactivé' : ' libre');
-            }
+        if ($this->getConfiguration('alexaEnable', 0)) {
+            $parts[] = 'Alexa libre';
+        }
+        if ($this->getConfiguration('remiEnable', 0)) {
+            $parts[] = $this->remiStatusPart();
         }
         $this->checkAndUpdateCmd('sync_ok', 1);
         $this->setSyncStatus('OK : ' . (empty($parts) ? 'rien à programmer' : implode(' | ', $parts))
@@ -335,6 +330,16 @@ class reveil extends eqLogic {
 
     public function syncTargets($force = false) {
         $now = time();
+        if ($force) {
+            // "Resynchroniser" : le prochain réveil du Rémi est aussi mis en place tout de suite
+            $rw = $this->remiWakes(2);
+            foreach ($rw as $w) {
+                if (!$w['passed']) {
+                    $this->setCache('manualArmRemi', $w['datetime']);
+                    break;
+                }
+            }
+        }
         $next = $this->programmedWake();
         if ($next !== null && $next['passed']) {
             if (!$force) {
@@ -343,6 +348,7 @@ class reveil extends eqLogic {
                 if ($this->holdUntil() > $now) {
                     $this->watchDuringHold($now); // une alarme réglée à la main n'a pas encore sonné
                 } else {
+                    $this->syncRemiOnly();
                     $this->setPassedStatus($next);
                 }
                 return;
@@ -410,7 +416,7 @@ class reveil extends eqLogic {
             if ($remiOn) {
                 $remiNext = $this->remiTarget($next);
                 $parts[] = 'Rémi ' . ($derogR ? 'dérogation manuelle (' . $derogR['value'] . ')'
-                    : (!$remiConfirmed ? 'vérification en attente' : ($remiNext ? $remiNext['time'] . ' OK' : ($next ? $this->remiWaitReason($next) : 'désactivé'))));
+                    : (!$remiConfirmed ? 'vérification en attente' : ($remiNext ? ($remiNext['passed'] ? $remiNext['time'] . ' passé' : self::shortDay($remiNext['timestamp']) . ' ' . $remiNext['time'] . ' OK') : $this->remiWaitReason())));
             }
             if ((!$remiOn || $remiConfirmed) && (!$alexaOn || $alexaConfirmed) && ($remiOn || $alexaOn)) {
                 // tout confirmé à l'écriture : vérifié tout de suite, pas besoin d'attendre le cron
@@ -492,42 +498,111 @@ class reveil extends eqLogic {
     }
 
     /**
-     * Réveil à armer sur le Rémi : le prochain réveil (option « jours avec mon enfant » :
-     * le premier réveil à partir de celui-ci qui tombe un jour de garde), seulement à partir
-     * de sa veille à l'heure de passage, comme l'Alexa.
+     * Heure du Rémi pour un jour : son heure forcée (crayon Rémi) si elle existe,
+     * sinon celle du planning, seulement les jours avec enfant (option cochée).
      */
-    private function remiTarget($next) {
-        if ($next === null) {
+    private function remiDayTime($day, $remiExceptions) {
+        $date = $day['date'];
+        if (isset($remiExceptions[$date])) {
+            return $remiExceptions[$date] === 'off' ? null : $remiExceptions[$date];
+        }
+        if ($this->remiOnlyChild() && !reveilCalendar::custodyDay($date)) {
             return null;
         }
+        return $day['time'];
+    }
+
+    /**
+     * Réveils du Rémi à partir de maintenant (celui qui vient de sonner reste en tête
+     * jusqu'à l'heure de passage, comme pour l'Alexa).
+     * @return array liste de ['date','time','timestamp','datetime','passed']
+     */
+    private function remiWakes($limit = 2) {
+        $planning = $this->getPlanning();
+        $rx = (isset($planning['remiExceptions']) && is_array($planning['remiExceptions'])) ? $planning['remiExceptions'] : array();
         $now = time();
-        $manual = $this->getCache('manualArm', '');
-        if (!$this->remiOnlyChild()) {
-            return ($now >= self::armTime($next) || $manual === $next['datetime']) ? $next : null;
-        }
-        foreach (self::preview($this->getPlanning(), self::HORIZON_DAYS) as $day) {
-            if ($day['time'] === null) {
+        $out = array();
+        foreach (self::preview($planning, self::HORIZON_DAYS) as $day) {
+            $t = $this->remiDayTime($day, $rx);
+            if ($t === null) {
                 continue;
             }
-            $ts = strtotime($day['date'] . ' ' . $day['time']);
-            if ($ts < $next['timestamp']) {
+            $ts = strtotime($day['date'] . ' ' . $t);
+            if (max($ts + 3600, strtotime($day['date'] . ' ' . self::switchTime())) <= $now) {
                 continue;
             }
-            $day['timestamp'] = $ts;
-            $day['datetime'] = $day['date'] . ' ' . $day['time'];
-            if ($now < self::armTime($day) && $manual !== $day['datetime']) {
+            $out[] = array('date' => $day['date'], 'time' => $t, 'timestamp' => $ts, 'datetime' => $day['date'] . ' ' . $t, 'passed' => $ts <= $now,
+                'source' => isset($rx[$day['date']]) ? 'Rémi : heure forcée' : $day['source']);
+            if (count($out) >= $limit) {
                 break;
             }
-            if (reveilCalendar::custodyDay($day['date'])) {
-                return $day;
-            }
+        }
+        return $out;
+    }
+
+    /**
+     * Réveil à mettre sur le Rémi : le sien (il suit le planning de Papa, sauf heure forcée),
+     * mis en place la veille à l'heure de passage comme l'Alexa, ou tout de suite après « Resynchroniser ».
+     * $next est ignoré (gardé pour compatibilité des appels).
+     */
+    private function remiTarget($next = null) {
+        $wakes = $this->remiWakes(1);
+        if (empty($wakes)) {
+            return null;
+        }
+        $w = $wakes[0];
+        if ($w['passed'] || time() >= self::armTime($w) || $this->getCache('manualArmRemi', '') === $w['datetime']) {
+            return $w;
         }
         return null;
     }
 
-    /** Pourquoi le Rémi n'est pas armé alors qu'un réveil est prévu. */
-    private function remiWaitReason($next) {
-        return $this->remiOnlyChild() ? 'désactivé (jour sans enfant)' : 'désactivé';
+    /** Pourquoi le Rémi n'est pas armé. */
+    private function remiWaitReason($next = null) {
+        $wakes = $this->remiWakes(1);
+        if (empty($wakes)) {
+            return 'aucun réveil';
+        }
+        $w = $wakes[0];
+        return 'prévu ' . self::shortDay($w['timestamp']) . ' ' . $w['time'] . ', mis en place la veille';
+    }
+
+    /** Morceau de statut du Rémi (pour les états où seul le Rémi bouge). */
+    private function remiStatusPart() {
+        $t = $this->remiTarget();
+        if ($t === null) {
+            return 'Rémi ' . $this->remiWaitReason();
+        }
+        if ($t['passed']) {
+            return 'Rémi ' . $t['time'] . ' passé';
+        }
+        return 'Rémi ' . ($this->getCache('remiConfirmed', false) ? self::shortDay($t['timestamp']) . ' ' . $t['time'] . ' OK' : 'vérification en attente');
+    }
+
+    /**
+     * Le Rémi a son propre réveil : quand l'Alexa est en attente (réveil passé, veille pas encore
+     * atteinte), on le met quand même à jour s'il a changé.
+     */
+    private function syncRemiOnly() {
+        if (!$this->getConfiguration('remiEnable', 0) || $this->activeDerogation('Rémi') !== null) {
+            return;
+        }
+        $t = $this->remiTarget();
+        $sig = $t ? $t['datetime'] : 'none';
+        if ($sig === $this->getCache('pushedRemi', '')) {
+            return;
+        }
+        try {
+            $this->setCache('remiConfirmed', false);
+            $this->pushRemi($t);
+            $this->setCache('pushedRemi', $sig);
+            $check = $this->verifyRemi($t);
+            $this->setCache('remiConfirmed', $check['ok']);
+            $this->checkAndUpdateCmd('remi_ok', $check['ok'] ? 1 : 0);
+            log::add('reveil', 'info', $this->getHumanName() . ' Rémi : ' . ($t ? $t['datetime'] . ' (' . $t['source'] . ')' : 'désactivé'));
+        } catch (Exception $e) {
+            log::add('reveil', 'error', $this->getHumanName() . ' Rémi : ' . $e->getMessage());
+        }
     }
 
     /**
@@ -588,8 +663,8 @@ class reveil extends eqLogic {
                 } catch (Exception $e) {
                     log::add('reveil', 'debug', 'confirmation Rémi : ' . $e->getMessage());
                 }
-                if ($next !== null && $remiNext === null) {
-                    log::add('reveil', 'info', $this->getHumanName() . ' Rémi ' . $this->remiWaitReason($next));
+                if ($remiNext === null) {
+                    log::add('reveil', 'info', $this->getHumanName() . ' Rémi désactivé : ' . $this->remiWaitReason());
                 }
             } catch (Exception $e) {
                 log::add('reveil', 'error', $this->getHumanName() . ' Rémi : ' . $e->getMessage());
@@ -723,8 +798,8 @@ class reveil extends eqLogic {
                 $parts[] = $target . ' dérogation manuelle (' . $d['value'] . ')';
             } elseif (is_array($old) && isset($old['until']) && $old['until'] > $this->getCache('heldSince', 0)) {
                 $parts[] = $target . ' dérogation passée (' . $old['value'] . ')';
-            } elseif ($target == 'Rémi' && is_array($held) && $this->remiTarget($held) === null) {
-                $parts[] = 'Rémi ' . $this->remiWaitReason($held);
+            } elseif ($target == 'Rémi') {
+                $parts[] = $this->remiStatusPart();
             } else {
                 $parts[] = $target . ' ' . (is_array($held) ? $held['time'] : '') . ' OK';
             }
@@ -815,10 +890,14 @@ class reveil extends eqLogic {
                     $manual = strtotime(($read['date'] ?: ($next ? $next['date'] : date('Y-m-d'))) . ' ' . $read['time']);
                 }
             } else {
+                $rt = $this->remiTarget();
+                if ($rt) {
+                    $planned = $manual = $rt['timestamp'];
+                }
                 list($eqId, $name) = $this->remiParams();
                 $alarm = reveilRemi::find(reveilRemi::equipment($eqId), $name, false);
-                if ($alarm !== null && $alarm['enabled'] && $next) {
-                    $manual = strtotime($next['date'] . ' ' . $alarm['time']);
+                if ($alarm !== null && $alarm['enabled'] && $rt) {
+                    $manual = strtotime($rt['date'] . ' ' . $alarm['time']);
                 }
             }
         } catch (Exception $e) {
@@ -1114,8 +1193,8 @@ class reveil extends eqLogic {
         list($eqId, $name, $mondayFirst) = $this->remiParams();
         $isoDay = $remiNext ? (int) (new DateTime($remiNext['date']))->format('N') : 1;
         $r = reveilRemi::verify($eqId, $name, $remiNext ? $remiNext['time'] : null, $isoDay, $mondayFirst);
-        if ($r['ok'] && $next !== null && $remiNext === null) {
-            $r['detail'] = $this->remiWaitReason($next);
+        if ($r['ok'] && $remiNext === null) {
+            $r['detail'] = $this->remiWaitReason();
         }
         return $r;
     }
@@ -1213,10 +1292,45 @@ class reveil extends eqLogic {
     }
 
     /**
+     * Heure forcée du Rémi pour un jour (crayon « Rémi » du widget) :
+     * "HH:MM", "off" (pas de réveil Rémi) ou "" (retour : suit le planning).
+     */
+    public function setRemiException($date, $value) {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            throw new Exception('Date invalide : ' . $date);
+        }
+        $value = mb_strtolower(trim((string) $value));
+        $planning = $this->getPlanning();
+        if (!isset($planning['remiExceptions']) || !is_array($planning['remiExceptions'])) {
+            $planning['remiExceptions'] = array();
+        }
+        if ($value === '') {
+            unset($planning['remiExceptions'][$date]);
+        } elseif ($value === 'off') {
+            $planning['remiExceptions'][$date] = 'off';
+        } elseif (preg_match('/^(\d{1,2})[:h](\d{2})$/', $value, $m)) {
+            $planning['remiExceptions'][$date] = sprintf('%02d:%02d', $m[1], $m[2]);
+        } else {
+            throw new Exception('Valeur invalide : ' . $value . ' (HH:MM, off ou vide)');
+        }
+        foreach (array_keys($planning['remiExceptions']) as $d) {
+            if ($d < date('Y-m-d', strtotime('-7 days'))) {
+                unset($planning['remiExceptions'][$d]);
+            }
+        }
+        $this->setConfiguration('planning', $planning);
+        $this->save(true);
+        log::add('reveil', 'info', $this->getHumanName() . ' Rémi ' . $date . ' : ' . ($value === '' ? 'suit le planning' : $value));
+        $this->syncTargets();
+        $this->refreshWidget();
+    }
+
+    /**
      * Réglage d'une semaine entière depuis le widget (lundi → vendredi, comme les profils).
      * $week : semaine ISO "2026-W46" ; $value :
      *   "profile:<nom>" profil de semaine, "time:HH:MM" même heure lun-ven,
      *   "off" pas de réveil lun-ven, "normal" retour à la règle habituelle.
+     *   Préfixe "remi:" (ex. "remi:time:07:30") : seulement l'heure du Rémi.
      * Les jours déjà passés, les profils du jour (rugby…) et, pour une heure, les congés et fériés ne sont pas touchés.
      */
     public function setWeek($week, $value) {
@@ -1229,6 +1343,41 @@ class reveil extends eqLogic {
         $value = trim((string) $value);
         $planning = $this->getPlanning();
         $today = date('Y-m-d');
+        if (strpos($value, 'remi:') === 0) {
+            // semaine du Rémi seulement : heures forcées du lundi au vendredi
+            $v = substr($value, 5);
+            if ($v === 'normal') {
+                $rv = '';
+            } elseif ($v === 'off') {
+                $rv = 'off';
+            } elseif (strpos($v, 'time:') === 0 && preg_match('/^(\d{1,2}):(\d{2})$/', substr($v, 5), $tm)) {
+                $rv = sprintf('%02d:%02d', $tm[1], $tm[2]);
+            } else {
+                throw new Exception('Valeur invalide : ' . $value);
+            }
+            if (!isset($planning['remiExceptions']) || !is_array($planning['remiExceptions'])) {
+                $planning['remiExceptions'] = array();
+            }
+            $d = clone $monday;
+            for ($i = 0; $i < 5; $i++) {
+                $date = $d->format('Y-m-d');
+                $d->modify('+1 day');
+                if ($date < $today) {
+                    continue;
+                }
+                if ($rv === '') {
+                    unset($planning['remiExceptions'][$date]);
+                } elseif ($rv === 'off' || reveilCalendar::isFerie($date) === false) {
+                    $planning['remiExceptions'][$date] = $rv; // une heure ne s'impose pas sur un férié
+                }
+            }
+            $this->setConfiguration('planning', $planning);
+            $this->save(true);
+            log::add('reveil', 'info', $this->getHumanName() . ' semaine ' . $key . ' Rémi : ' . $v);
+            $this->syncTargets();
+            $this->refreshWidget();
+            return;
+        }
         $dayValue = null; // valeur des exceptions lun-ven ('' = supprimer)
         if ($value === 'normal') {
             unset($planning['weeks'][$key]);
@@ -1357,7 +1506,7 @@ class reveil extends eqLogic {
             return $replace;
         }
         $version = jeedom::versionAlias($_version);
-        if (!is_object($this->getCmd(null, 'toggle_garde')) || !is_object($this->getCmd(null, 'toggle_conges')) || !is_object($this->getCmd(null, 'toggle_dayprofile')) || !is_object($this->getCmd(null, 'alexa_status')) || !is_object($this->getCmd(null, 'verify')) || !is_object($this->getCmd(null, 'set_week'))) {
+        if (!is_object($this->getCmd(null, 'toggle_garde')) || !is_object($this->getCmd(null, 'toggle_conges')) || !is_object($this->getCmd(null, 'toggle_dayprofile')) || !is_object($this->getCmd(null, 'alexa_status')) || !is_object($this->getCmd(null, 'verify')) || !is_object($this->getCmd(null, 'set_week')) || !is_object($this->getCmd(null, 'set_remi'))) {
             $this->createCmds();
         }
         $toggle = $this->getCmd(null, 'toggle_conges');
@@ -1392,6 +1541,9 @@ class reveil extends eqLogic {
         $replace['#day_pens#'] = $pens;
         $exc = $this->getCmd(null, 'set_exception');
         $replace['#exception_id#'] = is_object($exc) ? $exc->getId() : '';
+        $setRemi = $this->getCmd(null, 'set_remi');
+        $replace['#set_remi_id#'] = is_object($setRemi) ? $setRemi->getId() : '';
+        $replace['#remi_pen_style#'] = $this->getConfiguration('remiEnable', 0) ? '' : 'display:none;';
         $setWeek = $this->getCmd(null, 'set_week');
         $replace['#set_week_id#'] = is_object($setWeek) ? $setWeek->getId() : '';
         $wbtns = '';
@@ -1453,6 +1605,17 @@ class reveil extends eqLogic {
                 continue;
             }
             $day = self::computeDay($planning, $date);
+            $rx = (isset($planning['remiExceptions']) && is_array($planning['remiExceptions'])) ? $planning['remiExceptions'] : array();
+            $remiLine = '';
+            if ($this->getConfiguration('remiEnable', 0)) {
+                $rt = $this->remiDayTime($day, $rx);
+                if (isset($rx[$date])) {
+                    // heure forcée du Rémi : toujours affichée
+                    $remiLine = '<span class="rv-rtime rv-rforced" title="Rémi : heure forcée">R ' . ($rt ?: '—') . '</span>';
+                } elseif ($rt !== null && $rt !== $day['time']) {
+                    $remiLine = '<span class="rv-rtime">R ' . $rt . '</span>';
+                }
+            }
             $classes = array('rv-day');
             if ($date < $today) {
                 $classes[] = 'rv-past';
@@ -1486,6 +1649,7 @@ class reveil extends eqLogic {
                 . '<span class="rv-num">' . $label . '</span>'
                 . '<span class="rv-time">' . ($day['time'] ?: '—') . '</span>'
                 . ($dayName !== '' ? '<span class="rv-dname">' . htmlspecialchars(mb_substr($dayName, 0, 6), ENT_QUOTES) . '</span>' : '')
+                . $remiLine
                 . '</div>';
             $d->modify('+1 day');
         }
@@ -1539,6 +1703,7 @@ class reveil extends eqLogic {
             'skip_next' => array('Pas de prochain réveil', 'action', 'other'),
             'set_exception' => array('Exception', 'action', 'message'),
             'set_week' => array('Régler une semaine', 'action', 'message'),
+            'set_remi' => array('Heure Rémi', 'action', 'message'),
             'toggle_conges' => array('Basculer congé', 'action', 'message'),
             'toggle_garde' => array('Basculer garde', 'action', 'message'),
             'toggle_dayprofile' => array('Basculer profil du jour', 'action', 'message'),
@@ -1554,9 +1719,13 @@ class reveil extends eqLogic {
                 $cmd->setType($def[1]);
                 $cmd->setSubType($def[2]);
                 $cmd->setOrder($order);
+                if ($logical == 'set_remi') {
+                    $cmd->setDisplay('title_placeholder', 'Date AAAA-MM-JJ');
+                    $cmd->setDisplay('message_placeholder', 'HH:MM, off ou vide');
+                }
                 if ($logical == 'set_week') {
                     $cmd->setDisplay('title_placeholder', 'Semaine AAAA-Wss');
-                    $cmd->setDisplay('message_placeholder', 'profile:Nom, time:HH:MM, off ou normal');
+                    $cmd->setDisplay('message_placeholder', 'profile:Nom, time:HH:MM, off, normal (préfixe remi: pour le Rémi)');
                 }
                 if ($logical == 'set_exception') {
                     $cmd->setDisplay('title_placeholder', 'Date AAAA-MM-JJ');
@@ -1602,6 +1771,9 @@ class reveilCmd extends cmd {
                 break;
             case 'set_exception':
                 $eq->setException(trim($_options['title']), isset($_options['message']) ? $_options['message'] : '');
+                break;
+            case 'set_remi':
+                $eq->setRemiException(trim($_options['title']), isset($_options['message']) ? $_options['message'] : '');
                 break;
             case 'set_week':
                 $eq->setWeek(trim($_options['title']), isset($_options['message']) ? $_options['message'] : '');
