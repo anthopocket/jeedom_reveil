@@ -7,7 +7,10 @@
   </center>
 
   <div class="rv-next" title="#sync_title#">
-    <i class="fas fa-circle rv-sync-#sync_class#"></i> <span class="rv-next-val">#next_wake#</span>
+    <i class="fas fa-circle rv-sync-#sync_class#"></i> <span class="rv-next-who">#name_me#</span> <span class="rv-next-val">#next_wake_fmt#</span>
+  </div>
+  <div class="rv-next rv-next-remi" style="#remi_pen_style#">
+    <span class="rv-next-who">#name_remi#</span> <span class="rv-next-rval">#remi_next_fmt#</span>
   </div>
   <div class="rv-status" data-raw="#sync_title#">#status_html#</div>
   <div class="rv-welcome">
@@ -18,7 +21,6 @@
     <span class="rv-pen rv-pen-time" data-pen="time"><i class="fas fa-pen"></i> {{Heure}}</span>
     <span class="rv-pen rv-pen-conges active" data-pen="conges"><i class="fas fa-circle"></i> {{Congé}}</span>
     <span class="rv-pen rv-pen-child" data-pen="garde"><i class="fas fa-child"></i> {{Enfant}}</span>
-    <span class="rv-pen rv-pen-remi" data-pen="remi" style="#remi_pen_style#" title="{{Changer l'heure du Rémi seulement, pour un jour}}"><i class="fas fa-bell"></i> {{Rémi}}</span>
     #day_pens#
     <span class="rv-gear rv-verify" title="{{Vérifier les réveils (sans reprogrammer)}}"><i class="fas fa-check-double"></i></span>
     <span class="rv-gear rv-resync" title="{{Resynchroniser : réapplique le planning sur l'Alexa et le Rémi (annule les dérogations)}}"><i class="fas fa-sync-alt"></i></span>
@@ -26,6 +28,10 @@
   </div>
   <div class="rv-pop" style="display:none;">
     <div class="rv-pop-date"></div>
+    <div class="rv-pop-who" style="#remi_pen_style#">
+      {{Pour}} : <a class="btn btn-xs btn-default rv-pop-target" data-target="me">#name_me#</a><a class="btn btn-xs btn-default rv-pop-target" data-target="remi">#name_remi#</a><a class="btn btn-xs btn-default rv-pop-target" data-target="both">{{Les deux}}</a>
+    </div>
+    <div class="rv-pop-note" style="display:none;"></div>
     <input type="time" class="rv-pop-time"/>
     <div class="rv-pop-btns">
       <a class="btn btn-xs btn-success rv-pop-ok">{{OK}}</a>
@@ -37,7 +43,7 @@
   <div class="rv-wpop" style="display:none;">
     <div class="rv-pop-date rv-wpop-title"></div>
     <div class="rv-wpop-who" style="#remi_pen_style#">
-      {{Pour}} : <a class="btn btn-xs btn-default rv-wpop-target active" data-target="me">{{Moi}}</a><a class="btn btn-xs btn-default rv-wpop-target" data-target="remi"><i class="fas fa-bell"></i> {{Rémi}}</a>
+      {{Pour}} : <a class="btn btn-xs btn-default rv-wpop-target active" data-target="me">#name_me#</a><a class="btn btn-xs btn-default rv-wpop-target" data-target="remi">#name_remi#</a>
     </div>
     <div class="rv-wpop-me">
       <div class="rv-wpop-label">{{Profil de la semaine}}</div>
@@ -60,6 +66,10 @@
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-sync-ok { color:#4caf50; font-size:.6em; vertical-align:middle; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-sync-ko { color:#e53935; font-size:.6em; vertical-align:middle; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-next { margin-bottom:2px; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-next-who { font-weight:normal; opacity:.7; font-size:.8em; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-next-remi { font-size:1em; color:#00acc1; margin-top:-2px; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-who { font-size:.75em; font-weight:normal; opacity:.65; margin-right:1px; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-tline { line-height:1.15; white-space:nowrap; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-status { text-align:center; font-size:.72em; line-height:1.35; margin:0 6px 6px; opacity:.85; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-status div { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-st-ok { color:#4caf50; }
@@ -85,7 +95,11 @@
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-wpop-label { font-size:.8em; opacity:.7; margin:6px 0 3px; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-wpop-btns .btn { margin:2px; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-wpop-prof.active { font-weight:bold; border-color:#fb8c00; }
-    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-wpop-who { margin:4px 0 2px; font-size:.85em; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-wpop-who, .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pop-who { margin:2px 0 6px; font-size:.85em; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pop-who .btn { margin:0 2px; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pop-note { font-size:.78em; color:#00acc1; margin:0 0 6px; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pop-target.active { font-weight:bold; border-color:#fb8c00; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pop-target[data-target="remi"].active { border-color:#00acc1; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-wpop-who .btn { margin:0 2px; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-wpop-target.active { font-weight:bold; border-color:#00acc1; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-wpop-target[data-target="me"].active { border-color:#fb8c00; }
@@ -105,7 +119,7 @@
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pen-day i { color:#8e24aa; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pen-time i { color:#fb8c00; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pen-remi i { color:#00acc1; }
-    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-rtime { font-size:.68em; color:#00acc1; line-height:1.1; white-space:nowrap; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-rtime { font-size:.78em; color:#00acc1; line-height:1.15; white-space:nowrap; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-rforced { font-weight:bold; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-conges .rv-rtime { color:#fff; }
     .reveil-widget[data-eqLogic_uid="#uid#"] { position:relative; }
@@ -117,7 +131,7 @@
     .reveil-widget.rv-empty[data-eqLogic_uid="#uid#"] .rv-pens,
     .reveil-widget.rv-empty[data-eqLogic_uid="#uid#"] .rv-cal,
     .reveil-widget.rv-empty[data-eqLogic_uid="#uid#"] .rv-legend,
-    .reveil-widget.rv-empty[data-eqLogic_uid="#uid#"] .rv-next { display:none; }
+    .reveil-widget.rv-empty[data-eqLogic_uid="#uid#"] .rv-next { display:none !important; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pop { position:absolute; z-index:20; left:50%; top:40%; transform:translate(-50%,-50%);
       background:var(--bg-modal-color, #2b2b2b); border:1px solid rgba(128,128,128,.5); border-radius:8px; padding:10px; text-align:center; min-width:220px; box-shadow:0 4px 16px rgba(0,0,0,.4); }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pop-date { font-weight:bold; margin-bottom:6px; }
@@ -146,6 +160,15 @@
 
       /* ---- statut synchro affiché en clair (une ligne par appareil, mis à jour en direct) ---- */
       function rvEsc(t) { return String(t).replace(/[&<>"]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+      var rvNames = {me: root.querySelector('.rv-next .rv-next-who').textContent, remi: (root.querySelector('.rv-next-remi .rv-next-who') || {}).textContent || 'Rémi'};
+      function rvFmt(v) {
+        var m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}:\d{2})/);
+        if (!m) { return v; }
+        var d = new Date(+m[1], +m[2] - 1, +m[3]);
+        var j = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'][d.getDay()];
+        var mo = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'][d.getMonth()];
+        return j + ' ' + d.getDate() + ' ' + mo + ' ' + m[4];
+      }
       function rvStatus(txt) {
         var box = root.querySelector('.rv-status');
         if (!box) { return; }
@@ -167,7 +190,8 @@
           if (/dérogation/i.test(part)) { cls = 'rv-st-derog'; }
           else if (/attente|programmé/i.test(part)) { cls = 'rv-st-wait'; }
           else if (/ÉCHEC|ECHEC|KO|erreur|introuvable|au lieu|toujours actif|absente|aucune alarme/i.test(part)) { cls = 'rv-st-ko'; }
-          html += '<div class="' + cls + '" title="' + rvEsc(part) + '">' + rvEsc(part) + '</div>';
+          var shown = part.replace(/^Alexa /, rvNames.me + ' ').replace(/^Rémi /, rvNames.remi + ' ');
+          html += '<div class="' + cls + '" title="' + rvEsc(part) + '">' + rvEsc(shown) + '</div>';
         });
         if (note) { html += '<div class="rv-st-note" title="' + rvEsc(note) + '">' + rvEsc(note) + '</div>'; }
         box.innerHTML = html;
@@ -191,7 +215,7 @@
       }
       function rvNext(v) {
         var el = root.querySelector('.rv-next-val');
-        if (el) { el.textContent = v; }
+        if (el) { el.textContent = rvFmt(v); }
       }
       rvOnUpdate('#sync_status_id#', function (_o) { rvStatus(rvVal(_o)); });
       rvOnUpdate('#sync_ok_id#', function (_o) { rvDot(rvVal(_o)); });
@@ -292,32 +316,56 @@
       }
 
       // ---- bulle "Heure" ----
-      var pop = root.querySelector('.rv-pop'), popDate = null, popCell = null, popMode = 'time';
+      var pop = root.querySelector('.rv-pop'), popDate = null, popCell = null;
       var dayNames = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+      // pour qui : moi (Alexa), Rémi, ou les deux — choix mémorisé sur l'appareil
+      var POPKEY = 'reveil_pop_target_#id#';
+      var popTarget = 'me';
+      try { popTarget = localStorage.getItem(POPKEY) || 'me'; } catch (e) {}
+      if ('#remi_pen_style#' !== '') { popTarget = 'me'; } // pas de Rémi sur cet équipement
+      function popPrefill() {
+        if (!popCell) { return; }
+        var t = (popCell.querySelector('.rv-time') || {}).textContent || '';
+        if (popTarget == 'remi' && popCell.querySelector('.rv-rval')) { t = popCell.querySelector('.rv-rval').textContent; }
+        root.querySelector('.rv-pop-time').value = /^\d{2}:\d{2}$/.test(t) ? t : '07:00';
+      }
+      function setPopTarget(t) {
+        popTarget = t;
+        try { localStorage.setItem(POPKEY, t); } catch (e) {}
+        root.querySelectorAll('.rv-pop-target').forEach(function (b) { b.classList.toggle('active', b.dataset.target === t); });
+        // jour sans enfant : le réveil d'Armand ne sera pas créé
+        var note = root.querySelector('.rv-pop-note');
+        var noChild = popCell && '#remi_only_child#' === '1' && !popCell.classList.contains('rv-child');
+        if (note) {
+          note.style.display = (noChild && t !== 'me') ? 'block' : 'none';
+          note.textContent = rvNames.remi + ' {{n\'est pas là ce jour : pas de réveil pour lui (crayon Enfant pour basculer le jour).}}';
+        }
+        popPrefill();
+      }
+      root.querySelectorAll('.rv-pop-target').forEach(function (b) {
+        b.addEventListener('click', function () { setPopTarget(b.dataset.target); });
+      });
       function sendException(value) {
         if (!popDate) { return; }
+        var cmdId = popTarget == 'me' ? '#exception_id#' : '#set_remi_id#';
+        if (cmdId === '') { alert('{{Commande absente : sauvegardez l\'équipement.}}'); return; }
         popCell.classList.add('rv-busy');
         pop.style.display = 'none';
-        var cmdId = popMode == 'remi' ? '#set_remi_id#' : '#exception_id#';
-        if (cmdId === '') { alert('{{Commande absente : sauvegardez l\'équipement.}}'); popCell.classList.remove('rv-busy'); return; }
         jeedom.cmd.execute({
           id: cmdId,
-          value: {title: popDate, message: value},
+          value: {title: popDate, message: (popTarget == 'both' ? 'both:' : '') + value},
           error: function (e) {
             popCell.classList.remove('rv-busy');
             if (window.jeedomUtils && jeedomUtils.showAlert) { jeedomUtils.showAlert({message: (e && e.message) ? e.message : '{{Erreur}}', level: 'danger'}); }
           }
         });
       }
-      function openPop(cell, mode) {
+      function openPop(cell) {
         popCell = cell;
-        popMode = mode || 'time';
         popDate = cell.dataset.date;
         var dt = new Date(popDate + 'T12:00:00');
-        root.querySelector('.rv-pop-date').textContent = (popMode == 'remi' ? '{{Rémi}} — ' : '') + dayNames[dt.getDay()] + ' ' + dt.getDate() + '/' + (dt.getMonth() + 1);
-        var t = (cell.querySelector('.rv-time') || {}).textContent || '';
-        if (popMode == 'remi' && cell.querySelector('.rv-rtime')) { t = cell.querySelector('.rv-rtime').textContent.replace(/^R\s*/, ''); }
-        root.querySelector('.rv-pop-time').value = /^\d{2}:\d{2}$/.test(t) ? t : '07:00';
+        root.querySelector('.rv-pop-date').textContent = dayNames[dt.getDay()] + ' ' + dt.getDate() + '/' + (dt.getMonth() + 1);
+        setPopTarget(popTarget);
         if (wpop) { wpop.style.display = 'none'; }
         pop.style.display = 'block';
       }
@@ -339,8 +387,8 @@
         if (!wCell) { return; }
         var n = wCell.nextElementSibling;
         for (var i = 0; i < 5 && n; i++, n = n.nextElementSibling) {
-          var el = (t === 'remi' && n.querySelector('.rv-rtime')) ? n.querySelector('.rv-rtime') : n.querySelector('.rv-time');
-          var v = el ? el.textContent.replace(/^R\s*/, '') : '';
+          var el = (t === 'remi' && n.querySelector('.rv-rval')) ? n.querySelector('.rv-rval') : n.querySelector('.rv-time');
+          var v = el ? el.textContent : '';
           if (/^\d{2}:\d{2}$/.test(v)) { root.querySelector('.rv-wpop-time').value = v; break; }
         }
       }
@@ -391,8 +439,7 @@
 
       root.querySelectorAll('.rv-day:not(.rv-gone)').forEach(function (cell) {
         cell.addEventListener('click', function () {
-          if (pen == 'time') { openPop(cell, 'time'); return; }
-          if (pen == 'remi') { openPop(cell, 'remi'); return; }
+          if (pen == 'time') { openPop(cell); return; }
           var isDay = pen.indexOf('day:') === 0;
           var c = isDay ? 'rv-dayprof' : cls[pen];
           var cmdId = isDay ? '#toggle_day_id#' : cmds[pen];

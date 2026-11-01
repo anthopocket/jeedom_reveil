@@ -267,6 +267,26 @@ class reveil extends eqLogic {
         return strtotime(date('Y-m-d', strtotime($wake['date'] . ' -1 day')) . ' ' . self::switchTime());
     }
 
+    /** Prénoms affichés : celui qui a l'Alexa (moi) et celui qui a le Rémi. */
+    public function nameMe() {
+        return trim($this->getConfiguration('nameMe', '')) ?: 'Papa';
+    }
+
+    public function nameRemi() {
+        return trim($this->getConfiguration('nameRemi', '')) ?: 'Armand';
+    }
+
+    /** "2026-11-02 06:30" -> "lun. 2 nov. 06:30" */
+    public static function fmtWake($datetime) {
+        $ts = strtotime($datetime);
+        if (!$ts) {
+            return (string) $datetime;
+        }
+        $j = array(1 => 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.');
+        $m = array('', 'janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.');
+        return $j[(int) date('N', $ts)] . ' ' . (int) date('j', $ts) . ' ' . $m[(int) date('n', $ts)] . ' ' . date('H:i', $ts);
+    }
+
     private static function shortDay($ts) {
         $j = array(1 => 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.');
         return $j[(int) date('N', $ts)] . ' ' . date('d/m', $ts);
@@ -498,16 +518,17 @@ class reveil extends eqLogic {
     }
 
     /**
-     * Heure du Rémi pour un jour : son heure forcée (crayon Rémi) si elle existe,
-     * sinon celle du planning, seulement les jours avec enfant (option cochée).
+     * Heure du Rémi pour un jour : jamais un jour sans enfant (option cochée), même avec une
+     * heure forcée (pour qu'il sonne, basculer le jour en bleu avec le crayon Enfant) ;
+     * sinon son heure forcée si elle existe, sinon celle du planning.
      */
     private function remiDayTime($day, $remiExceptions) {
         $date = $day['date'];
-        if (isset($remiExceptions[$date])) {
-            return $remiExceptions[$date] === 'off' ? null : $remiExceptions[$date];
-        }
         if ($this->remiOnlyChild() && !reveilCalendar::custodyDay($date)) {
             return null;
+        }
+        if (isset($remiExceptions[$date])) {
+            return $remiExceptions[$date] === 'off' ? null : $remiExceptions[$date];
         }
         return $day['time'];
     }
@@ -1294,6 +1315,7 @@ class reveil extends eqLogic {
     /**
      * Heure forcée du Rémi pour un jour (crayon « Rémi » du widget) :
      * "HH:MM", "off" (pas de réveil Rémi) ou "" (retour : suit le planning).
+     * Préfixe "both:" : même réglage aussi pour moi (exception du planning).
      */
     public function setRemiException($date, $value) {
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
@@ -1303,6 +1325,13 @@ class reveil extends eqLogic {
         $planning = $this->getPlanning();
         if (!isset($planning['remiExceptions']) || !is_array($planning['remiExceptions'])) {
             $planning['remiExceptions'] = array();
+        }
+        $both = false;
+        if (strpos($value, 'both:') === 0) {
+            // "Pour les deux" : même réglage pour moi (Alexa) et pour le Rémi, en un seul enregistrement
+            $both = true;
+            $value = substr($value, 5);
+            $planning = $this->applyException($planning, $date, $value);
         }
         if ($value === '') {
             unset($planning['remiExceptions'][$date]);
@@ -1320,7 +1349,7 @@ class reveil extends eqLogic {
         }
         $this->setConfiguration('planning', $planning);
         $this->save(true);
-        log::add('reveil', 'info', $this->getHumanName() . ' Rémi ' . $date . ' : ' . ($value === '' ? 'suit le planning' : $value));
+        log::add('reveil', 'info', $this->getHumanName() . ($both ? ' moi et Rémi ' : ' Rémi ') . $date . ' : ' . ($value === '' ? 'suit le planning' : $value));
         $this->syncTargets();
         $this->refreshWidget();
     }
@@ -1443,7 +1472,7 @@ class reveil extends eqLogic {
     }
 
     /** Statut synchro en clair pour le widget : une ligne colorée par appareil (rendu côté serveur, sans JS). */
-    public static function statusHtml($txt) {
+    public static function statusHtml($txt, $names = array()) {
         $txt = trim($txt);
         if ($txt === '') {
             return '';
@@ -1476,7 +1505,13 @@ class reveil extends eqLogic {
             } elseif (preg_match('/ÉCHEC|ECHEC|KO|erreur|introuvable|au lieu|toujours actif|absente|aucune alarme/u', $part)) {
                 $cls = 'rv-st-ko';
             }
-            $html .= '<div class="' . $cls . '" title="' . $esc($part) . '">' . $esc($part) . '</div>';
+            $shown = $part;
+            foreach ($names as $device => $name) {
+                if (strpos($shown, $device . ' ') === 0) {
+                    $shown = $name . ' ' . substr($shown, strlen($device) + 1);
+                }
+            }
+            $html .= '<div class="' . $cls . '" title="' . $esc($part) . '">' . $esc($shown) . '</div>';
         }
         if ($note !== '') {
             $html .= '<div class="rv-st-note">' . $esc($note) . '</div>';
@@ -1521,7 +1556,19 @@ class reveil extends eqLogic {
         $status = $this->getCmd(null, 'sync_status');
         $replace['#sync_title#'] = is_object($status) ? htmlspecialchars($status->execCmd(), ENT_QUOTES) : '';
         $replace['#sync_status_id#'] = is_object($status) ? $status->getId() : '';
-        $replace['#status_html#'] = self::statusHtml(is_object($status) ? (string) $status->execCmd() : '');
+        $replace['#status_html#'] = self::statusHtml(is_object($status) ? (string) $status->execCmd() : '', array('Alexa' => $this->nameMe(), 'Rémi' => $this->nameRemi()));
+        $replace['#name_me#'] = htmlspecialchars($this->nameMe(), ENT_QUOTES);
+        $replace['#name_remi#'] = htmlspecialchars($this->nameRemi(), ENT_QUOTES);
+        $replace['#next_wake_fmt#'] = $replace['#next_wake#'] !== '' ? self::fmtWake($replace['#next_wake#']) : '—';
+        $rw = $this->getConfiguration('remiEnable', 0) ? $this->remiWakes(2) : array();
+        $rnext = null;
+        foreach ($rw as $w) {
+            if (!$w['passed']) {
+                $rnext = $w;
+                break;
+            }
+        }
+        $replace['#remi_next_fmt#'] = $rnext ? self::fmtWake($rnext['datetime']) : 'pas de réveil prévu';
         $replace['#sync_ok_id#'] = is_object($ok) ? $ok->getId() : '';
         $verify = $this->getCmd(null, 'verify');
         $replace['#verify_id#'] = is_object($verify) ? $verify->getId() : '';
@@ -1544,6 +1591,7 @@ class reveil extends eqLogic {
         $setRemi = $this->getCmd(null, 'set_remi');
         $replace['#set_remi_id#'] = is_object($setRemi) ? $setRemi->getId() : '';
         $replace['#remi_pen_style#'] = $this->getConfiguration('remiEnable', 0) ? '' : 'display:none;';
+        $replace['#remi_only_child#'] = $this->remiOnlyChild() ? '1' : '0';
         $setWeek = $this->getCmd(null, 'set_week');
         $replace['#set_week_id#'] = is_object($setWeek) ? $setWeek->getId() : '';
         $wbtns = '';
@@ -1609,12 +1657,18 @@ class reveil extends eqLogic {
             $remiLine = '';
             if ($this->getConfiguration('remiEnable', 0)) {
                 $rt = $this->remiDayTime($day, $rx);
-                if (isset($rx[$date])) {
-                    // heure forcée du Rémi : toujours affichée
-                    $remiLine = '<span class="rv-rtime rv-rforced" title="Rémi : heure forcée">R ' . ($rt ?: '—') . '</span>';
-                } elseif ($rt !== null && $rt !== $day['time']) {
-                    $remiLine = '<span class="rv-rtime">R ' . $rt . '</span>';
+                $ini = htmlspecialchars(mb_substr($this->nameRemi(), 0, 1), ENT_QUOTES);
+                $remiDay = !$this->remiOnlyChild() || reveilCalendar::custodyDay($date);
+                if (isset($rx[$date]) && $remiDay) {
+                    // heure forcée du Rémi (jour avec enfant) : affichée en gras
+                    $remiLine = '<span class="rv-rtime rv-rforced" title="' . htmlspecialchars($this->nameRemi(), ENT_QUOTES) . ' : heure forcée"><span class="rv-who">' . $ini . '</span> <span class="rv-rval">' . ($rt ?: '—') . '</span></span>';
+                } elseif ($rt !== null) {
+                    $remiLine = '<span class="rv-rtime" title="' . htmlspecialchars($this->nameRemi(), ENT_QUOTES) . '"><span class="rv-who">' . $ini . '</span> <span class="rv-rval">' . $rt . '</span></span>';
                 }
+            }
+            $meIni = '';
+            if ($this->getConfiguration('remiEnable', 0)) {
+                $meIni = '<span class="rv-who">' . htmlspecialchars(mb_substr($this->nameMe(), 0, 1), ENT_QUOTES) . '</span> ';
             }
             $classes = array('rv-day');
             if ($date < $today) {
@@ -1647,7 +1701,7 @@ class reveil extends eqLogic {
             $title = $date . ' — ' . ($day['time'] ?: 'pas de réveil') . ' (' . $day['source'] . ')';
             $html .= '<div class="' . implode(' ', $classes) . '" data-date="' . $date . '" title="' . htmlspecialchars($title, ENT_QUOTES) . '">'
                 . '<span class="rv-num">' . $label . '</span>'
-                . '<span class="rv-time">' . ($day['time'] ?: '—') . '</span>'
+                . '<span class="rv-tline" title="' . htmlspecialchars($this->nameMe(), ENT_QUOTES) . '">' . $meIni . '<span class="rv-time">' . ($day['time'] ?: '—') . '</span></span>'
                 . ($dayName !== '' ? '<span class="rv-dname">' . htmlspecialchars(mb_substr($dayName, 0, 6), ENT_QUOTES) . '</span>' : '')
                 . $remiLine
                 . '</div>';

@@ -70,6 +70,13 @@ require_once dirname(__FILE__) . '/reveil_editor.inc.php';
                 </div>
               </div>
               <div class="form-group">
+                <label class="col-sm-4 control-label">{{Prénoms affichés}}
+                  <sup><i class="fas fa-question-circle tooltips" title="{{Celui qui a l'Alexa et celui qui a le Rémi : affichés sur le widget, dans les cases et les bulles.}}"></i></sup>
+                </label>
+                <div class="col-sm-3"><input type="text" class="eqLogicAttr form-control" data-l1key="configuration" data-l2key="nameMe" placeholder="Papa"/></div>
+                <div class="col-sm-3"><input type="text" class="eqLogicAttr form-control" data-l1key="configuration" data-l2key="nameRemi" placeholder="Armand"/></div>
+              </div>
+              <div class="form-group">
                 <label class="col-sm-4 control-label">{{Objet parent}}</label>
                 <div class="col-sm-6">
                   <select class="eqLogicAttr form-control" data-l1key="object_id">
