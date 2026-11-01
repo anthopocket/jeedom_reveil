@@ -6,8 +6,19 @@ if (!isConnect()) {
     die();
 }
 ?>
+<?php require_once dirname(__FILE__) . '/../core/class/reveil.class.php'; ?>
 <form class="form-horizontal">
   <fieldset>
+    <legend><i class="fas fa-info-circle"></i> {{Plugin}}</legend>
+    <div class="form-group">
+      <label class="col-md-4 control-label">{{Version}}</label>
+      <div class="col-md-8" style="padding-top:7px;">
+        <span class="label label-info"><?php echo htmlspecialchars(reveil::pluginVersion()); ?></span>
+        &nbsp;<a href="plugins/reveil/docs/fr_FR/index.md" target="_blank"><i class="fas fa-book"></i> {{Documentation}}</a>
+        &nbsp;<a href="plugins/reveil/docs/fr_FR/changelog.md" target="_blank"><i class="fas fa-list"></i> {{Journal des modifications}}</a>
+      </div>
+    </div>
+
     <legend><i class="fas fa-calendar-alt"></i> {{Calendriers}}</legend>
     <div class="form-group">
       <label class="col-md-4 control-label">{{Académie (vacances scolaires)}}</label>

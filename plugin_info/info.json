@@ -1,6 +1,7 @@
 {
     "id": "reveil",
     "name": "Réveils",
+    "pluginVersion": "1.7.0",
     "description": {
         "fr_FR": "Gestion centralisée des réveils (Alexa, Rémi) : profils hebdomadaires, garde alternée, congés, fériés et présence, avec vérification de la programmation sur les appareils."
     },

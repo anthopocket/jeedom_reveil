@@ -7,6 +7,12 @@ function reveil_install() {
 }
 
 function reveil_update() {
+    $previous = config::byKey('version', 'reveil', '');
+    $current = reveil::pluginVersion();
+    if ($previous !== $current) {
+        log::add('reveil', 'info', 'Plugin Réveils ' . ($previous === '' ? 'installé' : 'mis à jour de ' . $previous . ' vers') . ' ' . $current . ' (voir docs/fr_FR/changelog.md)');
+        config::save('version', $current, 'reveil');
+    }
     if (config::byKey('switchTime', 'reveil', '') == '') {
         config::save('switchTime', '12:00', 'reveil');
     }

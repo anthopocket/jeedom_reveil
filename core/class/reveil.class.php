@@ -267,6 +267,12 @@ class reveil extends eqLogic {
         return strtotime(date('Y-m-d', strtotime($wake['date'] . ' -1 day')) . ' ' . self::switchTime());
     }
 
+    /** Version du plugin (plugin_info/info.json). */
+    public static function pluginVersion() {
+        $info = json_decode((string) @file_get_contents(dirname(__FILE__) . '/../../plugin_info/info.json'), true);
+        return (is_array($info) && !empty($info['pluginVersion'])) ? $info['pluginVersion'] : '?';
+    }
+
     /** Prénoms affichés : celui qui a l'Alexa (moi) et celui qui a le Rémi. */
     public function nameMe() {
         return trim($this->getConfiguration('nameMe', '')) ?: 'Papa';
@@ -1662,7 +1668,7 @@ class reveil extends eqLogic {
                 $html .= '<div class="rv-week' . ($custody ? ' rv-custody' : '') . ($forced !== '' ? ' rv-week-forced' : '') . '" data-week="' . $wkey . '"'
                     . ' data-from="' . (int) $d->format('j') . ' ' . $months[(int) $d->format('n')] . '" data-to="' . (int) $fri->format('j') . ' ' . $months[(int) $fri->format('n')] . '"'
                     . ' data-profile="' . htmlspecialchars($forced, ENT_QUOTES) . '" title="' . htmlspecialchars($wtitle, ENT_QUOTES) . '">'
-                    . 'S' . $d->format('W') . ($custody ? '<i class="fas fa-child"></i>' : '') . ($forced !== '' ? '<span class="rv-wprof">' . htmlspecialchars(mb_substr($forced, 0, 5), ENT_QUOTES) . '</span>' : '') . '</div>';
+                    . 'S' . $d->format('W') . ($custody ? '<i class="fas fa-child"></i>' : '') . '</div>';
             }
             if ($date < $today) {
                 // planning glissant : les jours passés ne sont plus affichés
