@@ -43,13 +43,12 @@
   <div class="rv-wpop" style="display:none;">
     <div class="rv-pop-date rv-wpop-title"></div>
     <div class="rv-wpop-who" style="#remi_pen_style#">
-      {{Pour}} : <a class="btn btn-xs btn-default rv-wpop-target active" data-target="me">#name_me#</a><a class="btn btn-xs btn-default rv-wpop-target" data-target="remi">#name_remi#</a>
+      {{Pour}} : <a class="btn btn-xs btn-default rv-wpop-target active" data-target="me">#name_me#</a><a class="btn btn-xs btn-default rv-wpop-target" data-target="remi">#name_remi#</a><a class="btn btn-xs btn-default rv-wpop-target" data-target="both">{{Les deux}}</a>
     </div>
     <div class="rv-wpop-me">
       <div class="rv-wpop-label">{{Profil de la semaine}}</div>
       <div class="rv-wpop-btns">#week_profiles#</div>
     </div>
-    <div class="rv-wpop-btns"><a class="btn btn-xs btn-default rv-wpop-normal" title="{{Retour à la règle habituelle}}">{{Normal}}</a></div>
     <div class="rv-wpop-label">{{Ou du lundi au vendredi}}</div>
     <input type="time" class="rv-pop-time rv-wpop-time" value="06:30"/>
     <div class="rv-wpop-btns">
@@ -98,11 +97,14 @@
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-wpop-who, .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pop-who { margin:2px 0 6px; font-size:.85em; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pop-who .btn { margin:0 2px; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pop-note { font-size:.78em; color:#00acc1; margin:0 0 6px; }
-    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pop-target.active { font-weight:bold; border-color:#fb8c00; }
-    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pop-target[data-target="remi"].active { border-color:#00acc1; }
+
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-wpop-who .btn { margin:0 2px; }
-    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-wpop-target.active { font-weight:bold; border-color:#00acc1; }
-    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-wpop-target[data-target="me"].active { border-color:#fb8c00; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-wpop-target.active,
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pop-target.active { font-weight:bold; background:#fb8c00 !important; border-color:#fb8c00 !important; color:#fff !important; box-shadow:none; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-wpop-target[data-target="remi"].active,
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pop-target[data-target="remi"].active { background:#00acc1 !important; border-color:#00acc1 !important; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-wpop-target[data-target="both"].active,
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-pop-target[data-target="both"].active { background:#7e57c2 !important; border-color:#7e57c2 !important; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-custody { opacity:1; color:#1e88e5; font-weight:bold; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-num { font-size:.72em; opacity:.75; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-time { font-size:.85em; font-weight:bold; }
@@ -382,7 +384,7 @@
       function setWTarget(t) {
         wTarget = t;
         root.querySelectorAll('.rv-wpop-target').forEach(function (b) { b.classList.toggle('active', b.dataset.target === t); });
-        root.querySelector('.rv-wpop-me').style.display = (t === 'me') ? '' : 'none';
+        root.querySelector('.rv-wpop-me').style.display = (t === 'remi') ? 'none' : '';
         // heure proposée : celle déjà prévue cette semaine (Rémi : la sienne si elle diffère)
         if (!wCell) { return; }
         var n = wCell.nextElementSibling;
@@ -400,6 +402,8 @@
         if (wTarget === 'remi') {
           if (value.indexOf('profile:') === 0) { return; }
           value = 'remi:' + value;
+        } else if (wTarget === 'both') {
+          value = 'both:' + value;
         }
         if ('#set_week_id#' === '') { alert('{{Commande « Régler une semaine » absente : sauvegardez l\'équipement.}}'); return; }
         wpop.style.display = 'none';
@@ -429,7 +433,6 @@
       root.querySelectorAll('.rv-wpop-prof').forEach(function (b) {
         b.addEventListener('click', function () { sendWeek('profile:' + b.dataset.profile); });
       });
-      root.querySelector('.rv-wpop-normal').addEventListener('click', function () { sendWeek('normal'); });
       root.querySelector('.rv-wpop-ok').addEventListener('click', function () {
         var v = root.querySelector('.rv-wpop-time').value;
         if (/^\d{1,2}:\d{2}$/.test(v)) { sendWeek('time:' + v); }

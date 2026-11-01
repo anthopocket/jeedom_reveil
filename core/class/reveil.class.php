@@ -1358,8 +1358,9 @@ class reveil extends eqLogic {
      * Réglage d'une semaine entière depuis le widget (lundi → vendredi, comme les profils).
      * $week : semaine ISO "2026-W46" ; $value :
      *   "profile:<nom>" profil de semaine, "time:HH:MM" même heure lun-ven,
-     *   "off" pas de réveil lun-ven, "normal" retour à la règle habituelle.
-     *   Préfixe "remi:" (ex. "remi:time:07:30") : seulement l'heure du Rémi.
+     *   "off" pas de réveil lun-ven (le profil forcé et les heures modifiées sont retirés),
+     *   "normal" retour à la règle habituelle (scénarios).
+     *   Préfixe "remi:" : seulement le Rémi ; préfixe "both:" : moi et le Rémi.
      * Les jours déjà passés, les profils du jour (rugby…) et, pour une heure, les congés et fériés ne sont pas touchés.
      */
     public function setWeek($week, $value) {
@@ -1370,45 +1371,44 @@ class reveil extends eqLogic {
         $monday->setISODate((int) $m[1], (int) $m[2], 1);
         $key = trim($week);
         $value = trim((string) $value);
-        $planning = $this->getPlanning();
-        $today = date('Y-m-d');
+        $target = 'me';
         if (strpos($value, 'remi:') === 0) {
-            // semaine du Rémi seulement : heures forcées du lundi au vendredi
-            $v = substr($value, 5);
-            if ($v === 'normal') {
-                $rv = '';
-            } elseif ($v === 'off') {
-                $rv = 'off';
-            } elseif (strpos($v, 'time:') === 0 && preg_match('/^(\d{1,2}):(\d{2})$/', substr($v, 5), $tm)) {
-                $rv = sprintf('%02d:%02d', $tm[1], $tm[2]);
-            } else {
-                throw new Exception('Valeur invalide : ' . $value);
-            }
-            if (!isset($planning['remiExceptions']) || !is_array($planning['remiExceptions'])) {
-                $planning['remiExceptions'] = array();
-            }
-            $d = clone $monday;
-            for ($i = 0; $i < 5; $i++) {
-                $date = $d->format('Y-m-d');
-                $d->modify('+1 day');
-                if ($date < $today) {
-                    continue;
-                }
-                if ($rv === '') {
-                    unset($planning['remiExceptions'][$date]);
-                } elseif ($rv === 'off' || reveilCalendar::isFerie($date) === false) {
-                    $planning['remiExceptions'][$date] = $rv; // une heure ne s'impose pas sur un férié
-                }
-            }
-            $this->setConfiguration('planning', $planning);
-            $this->save(true);
-            log::add('reveil', 'info', $this->getHumanName() . ' semaine ' . $key . ' Rémi : ' . $v);
-            $this->syncTargets();
-            $this->refreshWidget();
-            return;
+            $target = 'remi';
+            $value = substr($value, 5);
+        } elseif (strpos($value, 'both:') === 0) {
+            $target = 'both';
+            $value = substr($value, 5);
         }
-        $dayValue = null; // valeur des exceptions lun-ven ('' = supprimer)
-        if ($value === 'normal') {
+        $planning = $this->getPlanning();
+        if ($target != 'remi') {
+            $planning = $this->weekForMe($planning, $monday, $key, $value);
+        }
+        if ($target != 'me') {
+            // un profil pour les deux : le Rémi suit simplement le planning
+            $planning = $this->weekForRemi($planning, $monday, strpos($value, 'profile:') === 0 ? 'normal' : $value);
+        }
+        $this->setConfiguration('planning', $planning);
+        $this->save(true);
+        log::add('reveil', 'info', $this->getHumanName() . ' semaine ' . $key . ' (' . $target . ') : ' . $value);
+        $this->syncTargets();
+        $this->refreshWidget();
+    }
+
+    /** Les 5 jours ouvrés (lun → ven) de la semaine, sans les jours passés. */
+    private static function weekDays($monday) {
+        $out = array();
+        $d = clone $monday;
+        for ($i = 0; $i < 5; $i++) {
+            if ($d->format('Y-m-d') >= date('Y-m-d')) {
+                $out[] = $d->format('Y-m-d');
+            }
+            $d->modify('+1 day');
+        }
+        return $out;
+    }
+
+    private function weekForMe($planning, $monday, $key, $value) {
+        if ($value === 'normal' || $value === 'off') {
             unset($planning['weeks'][$key]);
             $dayValue = '';
         } elseif (strpos($value, 'profile:') === 0) {
@@ -1420,32 +1420,50 @@ class reveil extends eqLogic {
             $dayValue = '';
         } elseif (strpos($value, 'time:') === 0 && preg_match('/^\d{1,2}:\d{2}$/', substr($value, 5))) {
             $dayValue = substr($value, 5);
-        } elseif ($value === 'off') {
-            $dayValue = 'off';
         } else {
             throw new Exception('Valeur invalide : ' . $value);
         }
-        $d = clone $monday;
-        for ($i = 0; $i < 5; $i++) {
-            $date = $d->format('Y-m-d');
-            $d->modify('+1 day');
-            if ($date < $today) {
-                continue;
-            }
+        foreach (self::weekDays($monday) as $date) {
             $cur = isset($planning['exceptions'][$date]) ? $planning['exceptions'][$date] : '';
             if ($cur !== '' && ($cur[0] == '@' || $cur == 'absent')) {
                 continue; // profil du jour ou absence : gardés
             }
-            if ($dayValue !== '' && $dayValue !== 'off' && (reveilCalendar::isPersonalLeave($date) !== false || reveilCalendar::isFerie($date) !== false)) {
+            if ($dayValue !== '' && (reveilCalendar::isPersonalLeave($date) !== false || reveilCalendar::isFerie($date) !== false)) {
                 continue; // une heure de semaine ne s'impose pas sur un congé ou un férié
             }
             $planning = $this->applyException($planning, $date, $dayValue);
+            if ($value === 'off') {
+                // "Pas de réveil" : on retire tout, et si un profil (défaut, garde) donne encore une heure, on l'annule
+                $day = self::computeDay($planning, $date);
+                if ($day['time'] !== null) {
+                    $planning = $this->applyException($planning, $date, 'off');
+                }
+            }
         }
-        $this->setConfiguration('planning', $planning);
-        $this->save(true);
-        log::add('reveil', 'info', $this->getHumanName() . ' semaine ' . $key . ' : ' . $value);
-        $this->syncTargets();
-        $this->refreshWidget();
+        return $planning;
+    }
+
+    private function weekForRemi($planning, $monday, $value) {
+        if ($value === 'normal') {
+            $rv = '';
+        } elseif ($value === 'off') {
+            $rv = 'off';
+        } elseif (strpos($value, 'time:') === 0 && preg_match('/^(\d{1,2}):(\d{2})$/', substr($value, 5), $tm)) {
+            $rv = sprintf('%02d:%02d', $tm[1], $tm[2]);
+        } else {
+            throw new Exception('Valeur invalide : ' . $value);
+        }
+        if (!isset($planning['remiExceptions']) || !is_array($planning['remiExceptions'])) {
+            $planning['remiExceptions'] = array();
+        }
+        foreach (self::weekDays($monday) as $date) {
+            if ($rv === '') {
+                unset($planning['remiExceptions'][$date]);
+            } elseif ($rv === 'off' || reveilCalendar::isFerie($date) === false) {
+                $planning['remiExceptions'][$date] = $rv; // une heure ne s'impose pas sur un férié
+            }
+        }
+        return $planning;
     }
 
     private function applyException($planning, $date, $value) {
@@ -1779,7 +1797,7 @@ class reveil extends eqLogic {
                 }
                 if ($logical == 'set_week') {
                     $cmd->setDisplay('title_placeholder', 'Semaine AAAA-Wss');
-                    $cmd->setDisplay('message_placeholder', 'profile:Nom, time:HH:MM, off, normal (préfixe remi: pour le Rémi)');
+                    $cmd->setDisplay('message_placeholder', 'profile:Nom, time:HH:MM, off, normal (préfixe remi: ou both:)');
                 }
                 if ($logical == 'set_exception') {
                     $cmd->setDisplay('title_placeholder', 'Date AAAA-MM-JJ');
