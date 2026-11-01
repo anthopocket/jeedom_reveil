@@ -33,6 +33,18 @@
       <a class="btn btn-xs btn-default rv-pop-close"><i class="fas fa-times"></i></a>
     </div>
   </div>
+  <div class="rv-wpop" style="display:none;">
+    <div class="rv-pop-date rv-wpop-title"></div>
+    <div class="rv-wpop-label">{{Profil de la semaine}}</div>
+    <div class="rv-wpop-btns">#week_profiles#<a class="btn btn-xs btn-default rv-wpop-normal" title="{{Retour à la règle habituelle (garde, profil par défaut)}}">{{Normal}}</a></div>
+    <div class="rv-wpop-label">{{Ou du lundi au vendredi}}</div>
+    <input type="time" class="rv-pop-time rv-wpop-time" value="06:30"/>
+    <div class="rv-wpop-btns">
+      <a class="btn btn-xs btn-success rv-wpop-ok">{{Lun-ven à cette heure}}</a>
+      <a class="btn btn-xs btn-default rv-wpop-off">{{Pas de réveil}}</a>
+      <a class="btn btn-xs btn-default rv-wpop-close"><i class="fas fa-times"></i></a>
+    </div>
+  </div>
   <div class="rv-cal">#grid#</div>
   <div class="rv-legend"><span class="rv-l rv-l-conges"></span>{{Congé}} <span class="rv-l rv-l-exc"></span>{{Modifié}} <span class="rv-l rv-l-off"></span>{{Férié}} <span class="rv-l rv-l-child"></span>{{Avec enfant}} <span class="rv-l rv-l-day"></span>{{Profil du jour}}</div>
 
@@ -57,6 +69,15 @@
       min-height:46px; padding:2px 0; box-sizing:border-box; overflow:hidden; border-radius:6px; background:rgba(128,128,128,.12); cursor:pointer; user-select:none; line-height:1.15; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-week { display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:.7em; opacity:.6; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-week i { font-size:1.1em; margin-top:2px; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-week { cursor:pointer; border-radius:6px; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-week:hover { opacity:1; background:rgba(128,128,128,.18); }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-week-forced { opacity:1; box-shadow:inset 3px 0 0 #fb8c00; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-wprof { font-size:.85em; color:#fb8c00; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-wpop { position:absolute; z-index:21; left:50%; top:45%; transform:translate(-50%,-50%);
+      background:var(--bg-modal-color, #2b2b2b); border:1px solid rgba(128,128,128,.5); border-radius:8px; padding:10px; text-align:center; min-width:260px; max-width:95%; box-shadow:0 4px 16px rgba(0,0,0,.4); }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-wpop-label { font-size:.8em; opacity:.7; margin:6px 0 3px; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-wpop-btns .btn { margin:2px; }
+    .reveil-widget[data-eqLogic_uid="#uid#"] .rv-wpop-prof.active { font-weight:bold; border-color:#fb8c00; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-custody { opacity:1; color:#1e88e5; font-weight:bold; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-num { font-size:.72em; opacity:.75; }
     .reveil-widget[data-eqLogic_uid="#uid#"] .rv-time { font-size:.85em; font-weight:bold; }
@@ -278,6 +299,7 @@
         root.querySelector('.rv-pop-date').textContent = dayNames[dt.getDay()] + ' ' + dt.getDate() + '/' + (dt.getMonth() + 1);
         var t = (cell.querySelector('.rv-time') || {}).textContent || '';
         root.querySelector('.rv-pop-time').value = /^\d{2}:\d{2}$/.test(t) ? t : '07:00';
+        if (wpop) { wpop.style.display = 'none'; }
         pop.style.display = 'block';
       }
       root.querySelector('.rv-pop-ok').addEventListener('click', function () {
@@ -287,6 +309,51 @@
       root.querySelector('.rv-pop-off').addEventListener('click', function () { sendException('off'); });
       root.querySelector('.rv-pop-reset').addEventListener('click', function () { sendException(''); });
       root.querySelector('.rv-pop-close').addEventListener('click', function () { pop.style.display = 'none'; });
+
+      // ---- bulle "Semaine" (clic sur le numéro de semaine) ----
+      var wpop = root.querySelector('.rv-wpop'), wCell = null;
+      function sendWeek(value) {
+        if (!wCell) { return; }
+        if ('#set_week_id#' === '') { alert('{{Commande « Régler une semaine » absente : sauvegardez l\'équipement.}}'); return; }
+        wpop.style.display = 'none';
+        var row = [];
+        var n = wCell.nextElementSibling;
+        for (var i = 0; i < 7 && n; i++, n = n.nextElementSibling) { row.push(n); }
+        row.forEach(function (c) { c.classList.add('rv-busy'); });
+        jeedom.cmd.execute({
+          id: '#set_week_id#',
+          value: {title: wCell.dataset.week, message: value},
+          error: function (e) {
+            row.forEach(function (c) { c.classList.remove('rv-busy'); });
+            if (window.jeedomUtils && jeedomUtils.showAlert) { jeedomUtils.showAlert({message: (e && e.message) ? e.message : '{{Erreur}}', level: 'danger'}); }
+          }
+        });
+      }
+      root.querySelectorAll('.rv-week[data-week]').forEach(function (cell) {
+        cell.addEventListener('click', function () {
+          wCell = cell;
+          pop.style.display = 'none';
+          root.querySelector('.rv-wpop-title').textContent = '{{Semaine}} ' + cell.dataset.week.split('-W')[1] + ' (' + cell.dataset.from + ' → ' + cell.dataset.to + ')';
+          root.querySelectorAll('.rv-wpop-prof').forEach(function (b) { b.classList.toggle('active', b.dataset.profile === cell.dataset.profile); });
+          // heure proposée : celle du premier jour ouvré affiché de la semaine
+          var n = cell.nextElementSibling;
+          for (var i = 0; i < 5 && n; i++, n = n.nextElementSibling) {
+            var t = (n.querySelector('.rv-time') || {}).textContent || '';
+            if (/^\d{2}:\d{2}$/.test(t)) { root.querySelector('.rv-wpop-time').value = t; break; }
+          }
+          wpop.style.display = 'block';
+        });
+      });
+      root.querySelectorAll('.rv-wpop-prof').forEach(function (b) {
+        b.addEventListener('click', function () { sendWeek('profile:' + b.dataset.profile); });
+      });
+      root.querySelector('.rv-wpop-normal').addEventListener('click', function () { sendWeek('normal'); });
+      root.querySelector('.rv-wpop-ok').addEventListener('click', function () {
+        var v = root.querySelector('.rv-wpop-time').value;
+        if (/^\d{1,2}:\d{2}$/.test(v)) { sendWeek('time:' + v); }
+      });
+      root.querySelector('.rv-wpop-off').addEventListener('click', function () { sendWeek('off'); });
+      root.querySelector('.rv-wpop-close').addEventListener('click', function () { wpop.style.display = 'none'; });
 
       root.querySelectorAll('.rv-day:not(.rv-gone)').forEach(function (cell) {
         cell.addEventListener('click', function () {

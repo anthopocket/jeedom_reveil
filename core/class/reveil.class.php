@@ -351,9 +351,16 @@ class reveil extends eqLogic {
             $next = $this->nextWake();
         }
         if ($next !== null && $now < self::armTime($next)) {
-            // trop tôt : le réveil ne sera programmé que la veille
-            $this->setIdle($next, $now, $force);
-            return;
+            if ($force) {
+                // "Resynchroniser" / "Programmer maintenant" : on programme tout de suite,
+                // et on s'en souvient pour que le cron ne repasse pas en attente
+                $this->setCache('manualArm', $next['datetime']);
+                log::add('reveil', 'info', $this->getHumanName() . ' réveil du ' . $next['datetime'] . ' programmé à la demande, sans attendre la veille');
+            } elseif ($this->getCache('manualArm', '') !== $next['datetime']) {
+                // trop tôt : le réveil ne sera programmé que la veille
+                $this->setIdle($next, $now, $force);
+                return;
+            }
         }
         $remiNext = $this->remiTarget($next);
         // la signature inclut le réveil armé sur le Rémi (garde) : s'il change, le Rémi est reprogrammé
@@ -494,8 +501,9 @@ class reveil extends eqLogic {
             return null;
         }
         $now = time();
+        $manual = $this->getCache('manualArm', '');
         if (!$this->remiOnlyChild()) {
-            return $now >= self::armTime($next) ? $next : null;
+            return ($now >= self::armTime($next) || $manual === $next['datetime']) ? $next : null;
         }
         foreach (self::preview($this->getPlanning(), self::HORIZON_DAYS) as $day) {
             if ($day['time'] === null) {
@@ -507,7 +515,7 @@ class reveil extends eqLogic {
             }
             $day['timestamp'] = $ts;
             $day['datetime'] = $day['date'] . ' ' . $day['time'];
-            if ($now < self::armTime($day)) {
+            if ($now < self::armTime($day) && $manual !== $day['datetime']) {
                 break;
             }
             if (reveilCalendar::custodyDay($day['date'])) {
@@ -1204,6 +1212,64 @@ class reveil extends eqLogic {
         $this->refreshWidget();
     }
 
+    /**
+     * Réglage d'une semaine entière depuis le widget (lundi → vendredi, comme les profils).
+     * $week : semaine ISO "2026-W46" ; $value :
+     *   "profile:<nom>" profil de semaine, "time:HH:MM" même heure lun-ven,
+     *   "off" pas de réveil lun-ven, "normal" retour à la règle habituelle.
+     * Les jours déjà passés, les profils du jour (rugby…) et, pour une heure, les congés et fériés ne sont pas touchés.
+     */
+    public function setWeek($week, $value) {
+        if (!preg_match('/^(\d{4})-W(\d{2})$/', trim($week), $m)) {
+            throw new Exception('Semaine invalide : ' . $week . ' (format AAAA-Wss)');
+        }
+        $monday = new DateTime();
+        $monday->setISODate((int) $m[1], (int) $m[2], 1);
+        $key = trim($week);
+        $value = trim((string) $value);
+        $planning = $this->getPlanning();
+        $today = date('Y-m-d');
+        $dayValue = null; // valeur des exceptions lun-ven ('' = supprimer)
+        if ($value === 'normal') {
+            unset($planning['weeks'][$key]);
+            $dayValue = '';
+        } elseif (strpos($value, 'profile:') === 0) {
+            $name = substr($value, 8);
+            if (!isset($planning['profiles'][$name])) {
+                throw new Exception('Profil inconnu : ' . $name);
+            }
+            $planning['weeks'][$key] = $name;
+            $dayValue = '';
+        } elseif (strpos($value, 'time:') === 0 && preg_match('/^\d{1,2}:\d{2}$/', substr($value, 5))) {
+            $dayValue = substr($value, 5);
+        } elseif ($value === 'off') {
+            $dayValue = 'off';
+        } else {
+            throw new Exception('Valeur invalide : ' . $value);
+        }
+        $d = clone $monday;
+        for ($i = 0; $i < 5; $i++) {
+            $date = $d->format('Y-m-d');
+            $d->modify('+1 day');
+            if ($date < $today) {
+                continue;
+            }
+            $cur = isset($planning['exceptions'][$date]) ? $planning['exceptions'][$date] : '';
+            if ($cur !== '' && ($cur[0] == '@' || $cur == 'absent')) {
+                continue; // profil du jour ou absence : gardés
+            }
+            if ($dayValue !== '' && $dayValue !== 'off' && (reveilCalendar::isPersonalLeave($date) !== false || reveilCalendar::isFerie($date) !== false)) {
+                continue; // une heure de semaine ne s'impose pas sur un congé ou un férié
+            }
+            $planning = $this->applyException($planning, $date, $dayValue);
+        }
+        $this->setConfiguration('planning', $planning);
+        $this->save(true);
+        log::add('reveil', 'info', $this->getHumanName() . ' semaine ' . $key . ' : ' . $value);
+        $this->syncTargets();
+        $this->refreshWidget();
+    }
+
     private function applyException($planning, $date, $value) {
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
             throw new Exception('Date invalide : ' . $date);
@@ -1291,7 +1357,7 @@ class reveil extends eqLogic {
             return $replace;
         }
         $version = jeedom::versionAlias($_version);
-        if (!is_object($this->getCmd(null, 'toggle_garde')) || !is_object($this->getCmd(null, 'toggle_conges')) || !is_object($this->getCmd(null, 'toggle_dayprofile')) || !is_object($this->getCmd(null, 'alexa_status')) || !is_object($this->getCmd(null, 'verify'))) {
+        if (!is_object($this->getCmd(null, 'toggle_garde')) || !is_object($this->getCmd(null, 'toggle_conges')) || !is_object($this->getCmd(null, 'toggle_dayprofile')) || !is_object($this->getCmd(null, 'alexa_status')) || !is_object($this->getCmd(null, 'verify')) || !is_object($this->getCmd(null, 'set_week'))) {
             $this->createCmds();
         }
         $toggle = $this->getCmd(null, 'toggle_conges');
@@ -1326,6 +1392,14 @@ class reveil extends eqLogic {
         $replace['#day_pens#'] = $pens;
         $exc = $this->getCmd(null, 'set_exception');
         $replace['#exception_id#'] = is_object($exc) ? $exc->getId() : '';
+        $setWeek = $this->getCmd(null, 'set_week');
+        $replace['#set_week_id#'] = is_object($setWeek) ? $setWeek->getId() : '';
+        $wbtns = '';
+        foreach (array_keys($this->getPlanning()['profiles']) as $name) {
+            $n = htmlspecialchars($name, ENT_QUOTES);
+            $wbtns .= '<a class="btn btn-xs btn-default rv-wpop-prof" data-profile="' . $n . '">' . $n . '</a>';
+        }
+        $replace['#week_profiles#'] = $wbtns;
         $pl = $this->getPlanning();
         $hasTimes = false;
         foreach ($pl['profiles'] as $days) {
@@ -1362,8 +1436,15 @@ class reveil extends eqLogic {
             $date = $d->format('Y-m-d');
             if ($i % 7 == 0) {
                 $custody = reveilCalendar::custodyWeek($date);
-                $html .= '<div class="rv-week' . ($custody ? ' rv-custody' : '') . '" title="' . ($custody === null ? '' : ($custody ? 'Semaine avec enfant' : 'Semaine sans enfant')) . '">'
-                    . 'S' . $d->format('W') . ($custody ? '<i class="fas fa-child"></i>' : '') . '</div>';
+                $wkey = $d->format('o-\WW');
+                $forced = isset($planning['weeks'][$wkey]) ? $planning['weeks'][$wkey] : '';
+                $wtitle = ($custody === null ? '' : ($custody ? 'Semaine avec enfant' : 'Semaine sans enfant'))
+                    . ($forced !== '' ? ' — profil ' . $forced : '') . ' — clic pour régler la semaine';
+                $fri = (clone $d)->modify('+4 days');
+                $html .= '<div class="rv-week' . ($custody ? ' rv-custody' : '') . ($forced !== '' ? ' rv-week-forced' : '') . '" data-week="' . $wkey . '"'
+                    . ' data-from="' . (int) $d->format('j') . ' ' . $months[(int) $d->format('n')] . '" data-to="' . (int) $fri->format('j') . ' ' . $months[(int) $fri->format('n')] . '"'
+                    . ' data-profile="' . htmlspecialchars($forced, ENT_QUOTES) . '" title="' . htmlspecialchars($wtitle, ENT_QUOTES) . '">'
+                    . 'S' . $d->format('W') . ($custody ? '<i class="fas fa-child"></i>' : '') . ($forced !== '' ? '<span class="rv-wprof">' . htmlspecialchars(mb_substr($forced, 0, 5), ENT_QUOTES) . '</span>' : '') . '</div>';
             }
             if ($date < $today) {
                 // planning glissant : les jours passés ne sont plus affichés
@@ -1457,6 +1538,7 @@ class reveil extends eqLogic {
             'verify' => array('Vérifier', 'action', 'other'),
             'skip_next' => array('Pas de prochain réveil', 'action', 'other'),
             'set_exception' => array('Exception', 'action', 'message'),
+            'set_week' => array('Régler une semaine', 'action', 'message'),
             'toggle_conges' => array('Basculer congé', 'action', 'message'),
             'toggle_garde' => array('Basculer garde', 'action', 'message'),
             'toggle_dayprofile' => array('Basculer profil du jour', 'action', 'message'),
@@ -1472,6 +1554,10 @@ class reveil extends eqLogic {
                 $cmd->setType($def[1]);
                 $cmd->setSubType($def[2]);
                 $cmd->setOrder($order);
+                if ($logical == 'set_week') {
+                    $cmd->setDisplay('title_placeholder', 'Semaine AAAA-Wss');
+                    $cmd->setDisplay('message_placeholder', 'profile:Nom, time:HH:MM, off ou normal');
+                }
                 if ($logical == 'set_exception') {
                     $cmd->setDisplay('title_placeholder', 'Date AAAA-MM-JJ');
                     $cmd->setDisplay('message_placeholder', 'HH:MM, off ou vide');
@@ -1516,6 +1602,9 @@ class reveilCmd extends cmd {
                 break;
             case 'set_exception':
                 $eq->setException(trim($_options['title']), isset($_options['message']) ? $_options['message'] : '');
+                break;
+            case 'set_week':
+                $eq->setWeek(trim($_options['title']), isset($_options['message']) ? $_options['message'] : '');
                 break;
         }
     }

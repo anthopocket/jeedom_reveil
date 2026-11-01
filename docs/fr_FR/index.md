@@ -84,6 +84,7 @@ Formats acceptés : `AAAA-MM-JJ HH:MM`, `HH:MM`, `HHmm`, `6h45` ou timestamp. Un
 - **Crayons** en haut : ✎ **Heure**, 🔴 **Congé**, 🔵 **Enfant**, plus un crayon par profil du jour. Le crayon choisi est mémorisé sur l'appareil.
 - **Crayon Heure** : un appui sur un jour ouvre une bulle avec trois boutons : une heure (OK), « Pas de réveil », ou « Normal » (retour au calcul habituel).
 - **Crayon Congé, un clic sur un jour** le bascule en **congé** (rouge), un second clic l'annule. Le congé est **global** : tous les réveils qui suivent tes congés sont recalculés et reprogrammés. Un clic au milieu d'une période de congés la découpe automatiquement.
+- **Régler une semaine entière** : un clic sur le numéro de semaine (S46…) ouvre une bulle. Tu peux appliquer un **profil** à la semaine, mettre **la même heure du lundi au vendredi**, choisir **pas de réveil**, ou revenir à **Normal**. Les profils du jour (rugby…) et les congés sont gardés. Une semaine forcée sur un profil est marquée en orange avec le nom du profil.
 - **Numéros de semaine** à gauche, avec l'icône enfant (bleue) sur les semaines de garde.
 - **Couleurs** : rouge = congé, contour orange = autre heure ce jour-là (un jour mis sur « Pas de réveil » reste une case vide normale), gris = férié, barre bleue en bas = jour avec ton enfant, « — » = pas de réveil.
 
